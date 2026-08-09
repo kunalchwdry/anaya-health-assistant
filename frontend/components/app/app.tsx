@@ -26,12 +26,50 @@ interface AppProps {
   appConfig: AppConfig;
 }
 
+function getPersistentIdentity(): string {
+  if (typeof window === 'undefined') {
+    return '';
+  }
+
+  const key = 'anaya_user_identity';
+  let identity = window.localStorage.getItem(key);
+
+  if (!identity) {
+    identity = `voice_assistant_user_${crypto.randomUUID()}`;
+    window.localStorage.setItem(key, identity);
+  }
+
+  return identity;
+}
 export function App({ appConfig }: AppProps) {
   const tokenSource = useMemo(() => {
-    return typeof process.env.NEXT_PUBLIC_CONN_DETAILS_ENDPOINT === 'string'
-      ? getSandboxTokenSource(appConfig)
-      : TokenSource.endpoint('/api/token');
-  }, [appConfig]);
+  if (typeof process.env.NEXT_PUBLIC_CONN_DETAILS_ENDPOINT === 'string') {
+    return getSandboxTokenSource(appConfig);
+  }
+
+  return TokenSource.endpoint('/api/token', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      participant_identity:
+        typeof window !== 'undefined'
+          ? (() => {
+              const key = 'anaya_user_identity';
+              let identity = window.localStorage.getItem(key);
+
+              if (!identity) {
+                identity = `voice_assistant_user_${crypto.randomUUID()}`;
+                window.localStorage.setItem(key, identity);
+              }
+
+              return identity;
+            })()
+          : undefined,
+    }),
+  });
+}, [appConfig]);
 
   const session = useSession(
     tokenSource,
