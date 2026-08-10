@@ -5,6 +5,7 @@ import {
   type VideoGrant,
 } from 'livekit-server-sdk';
 import { RoomConfiguration } from '@livekit/protocol';
+import { cookies } from 'next/headers';
 
 type ConnectionDetails = {
   serverUrl: string;
@@ -34,6 +35,16 @@ export async function POST(req: Request) {
       throw new Error('LIVEKIT_API_SECRET is not defined');
     }
 
+    const cookieStore = await cookies();
+
+    // Get the existing permanent caller ID.
+    let participantIdentity = cookieStore.get('anaya_user_id')?.value;
+
+    // First visit: create one.
+    if (!participantIdentity) {
+      participantIdentity = `anaya_user_${crypto.randomUUID()}`;
+    }
+
     const body = await req.json().catch(() => ({}));
 
     let roomConfig: RoomConfiguration | undefined;
@@ -46,56 +57,22 @@ export async function POST(req: Request) {
     } else if (AGENT_NAME) {
       roomConfig = RoomConfiguration.fromJson(
         {
-          agents: [
-            {
-              agentName: AGENT_NAME,
-            },
-          ],
+          agents: [{ agentName: AGENT_NAME }],
         },
         { ignoreUnknownFields: true }
       );
     }
 
-    // ---------------------------------------------------------
-    // Get persistent caller identity
-    // ---------------------------------------------------------
+    const participantName = 'user';
 
-    const requestedIdentity =
-      typeof body?.participant_identity === 'string'
-        ? body.participant_identity.trim()
-        : '';
+    // Room can be new every call.
+    // The USER ID stays the same.
+    const roomName = `voice_assistant_room_${crypto.randomUUID()}`;
 
-    const requestedName =
-      typeof body?.participant_name === 'string'
-        ? body.participant_name.trim()
-        : '';
-
-    // First try the identity supplied by the frontend.
-    // Otherwise use the persistent browser cookie.
-    // If neither exists, create a new identity.
-    const cookieIdentity = req.headers
-      .get('cookie')
-      ?.match(/anaya_user_id=([^;]+)/)?.[1];
-
-    const participantIdentity =
-      requestedIdentity ||
-      cookieIdentity ||
-      `voice_assistant_user_${crypto.randomUUID()}`;
-
-    const participantName =
-      requestedName || 'User';
-
-    // ---------------------------------------------------------
-    // Every conversation gets a NEW room.
-    // The caller identity stays the SAME.
-    // ---------------------------------------------------------
-
-    const roomName =
-      `voice_assistant_room_${crypto.randomUUID()}`;
-
-    // ---------------------------------------------------------
-    // Generate LiveKit token
-    // ---------------------------------------------------------
+    console.log(
+      '🔥 ANAYA STABLE USER ID:',
+      participantIdentity
+    );
 
     const participantToken = await createParticipantToken(
       {
@@ -119,25 +96,19 @@ export async function POST(req: Request) {
       },
     });
 
-    // Save the identity for future conversations.
-    response.cookies.set(
-      'anaya_user_id',
-      participantIdentity,
-      {
-        httpOnly: true,
-        sameSite: 'lax',
-        secure: process.env.NODE_ENV === 'production',
-        maxAge: 60 * 60 * 24 * 365,
-        path: '/',
-      }
-    );
+    // Keep this ID for future calls from this browser.
+    response.cookies.set('anaya_user_id', participantIdentity, {
+      httpOnly: true,
+      sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production',
+      maxAge: 60 * 60 * 24 * 365 * 5,
+      path: '/',
+    });
 
     return response;
-
   } catch (error) {
     if (error instanceof Error) {
       console.error(error);
-
       return new NextResponse(error.message, {
         status: 500,
       });
@@ -149,16 +120,11 @@ export async function POST(req: Request) {
   }
 }
 
-// ---------------------------------------------------------
-// Create LiveKit participant token
-// ---------------------------------------------------------
-
 function createParticipantToken(
   userInfo: AccessTokenOptions,
   roomName: string,
   roomConfig?: RoomConfiguration
 ): Promise<string> {
-
   const at = new AccessToken(API_KEY!, API_SECRET!, {
     ...userInfo,
     ttl: '15m',

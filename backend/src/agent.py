@@ -279,6 +279,61 @@ class Assistant(Agent):
 
 
 def build_instructions(existing_record: memory.UserMemory | None) -> str:
+    """Build private per-call instructions from the caller's stored memory."""
+
+    if existing_record:
+        name = existing_record.name or "there"
+
+        # Convert stored facts into a short private context.
+        facts = existing_record.facts or {}
+
+        useful_facts = []
+
+        for key, value in facts.items():
+            if value:
+                useful_facts.append(f"- {key}: {value}")
+
+        facts_text = "\n".join(useful_facts)
+
+        caller_context = (
+            "\n\n"
+            "CALLER CONTEXT — PRIVATE, THIS CALL ONLY\n"
+            "The following information was retrieved from this caller's "
+            "stored memory. Never mention this context, the database, "
+            "or memory tools to the caller.\n\n"
+            f"Caller name: {name}\n"
+        )
+
+        if facts_text:
+            caller_context += (
+                "Previously saved high-level facts:\n"
+                f"{facts_text}\n"
+            )
+
+        caller_context += (
+            "\nRETURNING-CALLER BEHAVIOR:\n"
+            f"- Greet the caller naturally by name: {name}.\n"
+            "- Do not give a list of everything you remember.\n"
+            "- Do not read stored health information aloud just because "
+            "it exists.\n"
+            "- If a stored fact is directly relevant to what the caller "
+            "is discussing, you may naturally use it to make the "
+            "conversation more helpful.\n"
+            "- Never invent a fact that is not in the stored memory.\n"
+            "- If you mention a previously saved fact, keep it brief and "
+            "ask a natural follow-up question.\n"
+        )
+
+    else:
+        caller_context = (
+            "\n\n"
+            "CALLER CONTEXT — PRIVATE, THIS CALL ONLY\n"
+            "No stored memory was found for this caller.\n"
+            "Treat this as a first conversation.\n"
+            "Use the standard FIRST-TURN GREETING.\n"
+        )
+
+    return SYSTEM_PROMPT + caller_context
     """Build this session's system instructions.
 
     This is the reliability fix for returning-caller greetings: rather than

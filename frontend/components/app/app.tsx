@@ -35,8 +35,8 @@ function getPersistentIdentity(): string {
   let identity = window.localStorage.getItem(key);
 
   if (!identity) {
-    identity = `voice_assistant_user_${crypto.randomUUID()}`;
-    window.localStorage.setItem(key, identity);
+    identity = `voice_assistant_user_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
+    windoxw.localStorage.setItem(key, identity);
   }
 
   return identity;
@@ -60,8 +60,7 @@ export function App({ appConfig }: AppProps) {
               let identity = window.localStorage.getItem(key);
 
               if (!identity) {
-                identity = `voice_assistant_user_${crypto.randomUUID()}`;
-                window.localStorage.setItem(key, identity);
+                identity = `voice_assistant_user_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;                window.localStorage.setItem(key, identity);
               }
 
               return identity;
