@@ -3,15 +3,6 @@ Persistent caller memory for Anaya (Day 4).
 
 Stores a minimal, high-level caller profile in a local SQLite database so
 that Anaya can recognize returning callers across agent restarts.
-
-Design notes:
-- Only Python's built-in sqlite3 is used; no new dependency is needed.
-- Only high-level facts are stored:
-  age_band, ongoing_conditions, last_triage_outcome.
-- Never store detailed medical notes, prescriptions, or diagnoses.
-- This module is the only place that touches the database.
-- agent.py never writes raw SQL.
-- Nothing here is automatically written into the LLM's system prompt.
 """
 
 from __future__ import annotations
@@ -19,6 +10,7 @@ from __future__ import annotations
 import json
 import logging
 import sqlite3
+import uuid
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
@@ -26,15 +18,12 @@ from pathlib import Path
 
 logger = logging.getLogger("agent.memory")
 
-
 # backend/data/anaya_memory.db
 DB_PATH = Path(__file__).resolve().parent.parent / "data" / "anaya_memory.db"
-
 
 @dataclass
 class UserMemory:
     """A minimal, high-level caller profile."""
-
     user_id: str
     name: str | None = None
     language_preference: str | None = None
@@ -53,9 +42,7 @@ def _ensure_data_dir() -> None:
 def _connect():
     """Yield a SQLite connection, ensuring the data directory exists."""
     _ensure_data_dir()
-
     conn = sqlite3.connect(DB_PATH)
-
     try:
         yield conn
     finally:
@@ -121,10 +108,7 @@ def get_user(user_id: str) -> UserMemory | None:
         return None
 
     if row is None:
-        logger.info(
-            "Lookup miss for user_id=%s",
-            user_id,
-        )
+        logger.info("Lookup miss for user_id=%s", user_id)
         return None
 
     (
@@ -138,16 +122,10 @@ def get_user(user_id: str) -> UserMemory | None:
     try:
         facts = json.loads(facts_json) if facts_json else {}
 
-        if not isinstance(facts, dict):
-            facts = {}
-
     except (TypeError, ValueError):
         facts = {}
 
-    logger.info(
-        "Lookup hit for user_id=%s",
-        user_id,
-    )
+    logger.info("Lookup hit for user_id=%s", user_id)
 
     return UserMemory(
         user_id=raw_user_id,
@@ -220,9 +198,6 @@ def save_user(
                         if existing_facts_json
                         else {}
                     )
-
-                    if not isinstance(merged_facts, dict):
-                        merged_facts = {}
 
                 except (TypeError, ValueError):
                     merged_facts = {}
@@ -314,3 +289,102 @@ def delete_user(user_id: str) -> bool:
             user_id,
         )
         return False
+
+
+# =======================
+# NEW: Escalation support
+# =======================
+
+def init_escalations_db() -> None:
+    """Create the escalations table if it does not exist."""
+    try:
+        with _connect() as conn:
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS escalations (
+                    reference_id TEXT PRIMARY KEY,
+                    user_id TEXT,
+                    reason TEXT,
+                    summary TEXT,
+                    already_checked INTEGER,
+                    urgency TEXT,
+                    language TEXT,
+                    follow_up_method TEXT,
+                    status TEXT,
+                    created_at TEXT
+                )
+                """
+            )
+            conn.commit()
+        logger.info("Escalations database ready")
+    except sqlite3.Error:
+        logger.exception("Failed to initialize escalations database")
+
+
+def create_escalation(
+    user_id: str,
+    reason: str,
+    summary: str,
+    urgency: str,
+    language: str,
+    follow_up_method: str,
+    status: str,
+) -> str:
+    """Create a new escalation record and return the reference ID."""
+    reference_id = str(uuid.uuid4())
+    created_at = datetime.now(UTC).isoformat(timespec="seconds")
+    try:
+        with _connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO escalations (
+                    reference_id,
+                    user_id,
+                    reason,
+                    summary,
+                    already_checked,
+                    urgency,
+                    language,
+                    follow_up_method,
+                    status,
+                    created_at
+                ) VALUES (?, ?, ?, ?, 0, ?, ?, ?, ?, ?)
+                """,
+                (
+                    reference_id,
+                    user_id,
+                    reason,
+                    summary,
+                    urgency,
+                    language,
+                    follow_up_method,
+                    status,
+                    created_at,
+                ),
+            )
+            conn.commit()
+        logger.info("Created escalation %s for user %s", reference_id, user_id)
+        _write_escalations_json()
+        return reference_id
+    except sqlite3.Error:
+        logger.exception("Failed to create escalation")
+        return ""  # Return empty string on failure
+
+
+def _write_escalations_json() -> None:
+    """Write all escalations to frontend/public/escalations.json."""
+    try:
+        with _connect() as conn:
+            rows = conn.execute(
+                "SELECT reference_id, user_id, reason, summary, urgency, language, follow_up_method, status, created_at "
+                "FROM escalations ORDER BY created_at DESC"
+            ).fetchall()
+        escalations = [dict(row) for row in rows]
+        json_path = Path(__file__).resolve().parent.parent.parent / "frontend" / "public" / "escalations.json"
+        json_path.write_text(json.dumps(escalations, indent=2))
+        logger.info("Wrote escalations JSON to %s", json_path)
+    except Exception as e:
+        logger.exception("Failed to write escalations JSON: %s", e)
+
+
+# Only these high-level facts may ever be stored.

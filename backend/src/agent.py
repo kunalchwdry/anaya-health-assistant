@@ -1,3 +1,4 @@
+import json
 import logging
 from datetime import datetime, timezone
 
@@ -165,6 +166,30 @@ of the conversation.
 Never read raw database information aloud.
 
 Only save personal information after explicit permission.
+
+DAY 7 — HUMAN-HELP ESCALATION
+
+You have a tool called:
+create_escalation
+
+Use it when the caller explicitly agrees to create a human-help escalation
+request after you have provided appropriate safety guidance.
+
+IMPORTANT:
+- Never create an escalation without explicit caller consent.
+- If the caller only asks for medical information, do not create one.
+- For serious or potentially dangerous symptoms, first encourage immediate
+  professional/emergency medical attention as appropriate.
+- Then ask whether the caller wants a human-help escalation request created.
+- Only after a clear yes/consent, call create_escalation.
+- After the tool returns a reference ID, tell the caller the request was created
+  and provide the reference ID.
+- Do not claim that a human has already contacted the caller.
+- Do not claim an ambulance, hospital, doctor, or emergency service was contacted.
+- Keep the response short and voice-friendly.
+- If an escalation already exists for the caller and the caller asks to create
+  another one, avoid unnecessary duplicate requests and explain that an
+  existing request is already open when the tool/data supports that conclusion.
 """
 
 
@@ -688,6 +713,95 @@ out center tags;
             )
 
 
+    # ========================================================
+    # DAY 7 — HUMAN-HELP ESCALATION
+    # ========================================================
+
+    @function_tool
+    async def create_escalation(
+        self,
+        context: RunContext,
+        reason: str,
+        summary: str,
+        urgency: str,
+        language: str,
+        follow_up_method: str,
+        status: str = "open",
+    ) -> str:
+        """
+        Create a human-help escalation request.
+
+        This tool must only be called after the caller has explicitly
+        consented to creating the escalation.
+        """
+        user_id = self._resolve_stable_user_id()
+
+        if not user_id:
+            return "Cannot create escalation: caller identity is unavailable."
+
+        reference_id = memory.create_escalation(
+            user_id=user_id,
+            reason=reason,
+            summary=summary,
+            urgency=urgency,
+            language=language,
+            follow_up_method=follow_up_method,
+            status=status,
+        )
+
+        if not reference_id:
+            return "I could not create the escalation request right now. Please try again."
+
+        logger.info(
+            "Created human-help escalation reference_id=%s user_id=%s",
+            reference_id,
+            user_id,
+        )
+
+        return (
+            f"Escalation created successfully. "
+            f"Reference ID: ESC-{reference_id[:8].upper()}"
+        )
+
+    @function_tool
+    async def list_open_escalations(
+        self,
+        context: RunContext,
+    ) -> str:
+        """
+        Return open escalation requests for the current caller.
+
+        This is intended for internal agent use. Never read raw database
+        information aloud to the caller.
+        """
+        user_id = self._resolve_stable_user_id()
+
+        if not user_id:
+            return "No caller identity available."
+
+        try:
+            with memory._connect() as conn:
+                rows = conn.execute(
+                    """
+                    SELECT reference_id, user_id, reason, urgency,
+                           language, follow_up_method, status, created_at
+                    FROM escalations
+                    WHERE user_id = ? AND status = 'open'
+                    ORDER BY created_at DESC
+                    """,
+                    (user_id,),
+                ).fetchall()
+
+            return json.dumps([dict(row) for row in rows], indent=2)
+
+        except Exception as error:
+            logger.exception(
+                "Failed to list open escalations: %s",
+                error,
+            )
+            return json.dumps({"error": str(error)})
+
+
 # ============================================================
 # PRIVATE CALLER CONTEXT
 # ============================================================
@@ -767,9 +881,10 @@ def prewarm(proc: JobProcess):
     proc.userdata["vad"] = silero.VAD.load()
 
     memory.init_db()
+    memory.init_escalations_db()
 
     logger.info(
-        "Memory database initialized"
+        "Memory and escalation databases initialized"
     )
 
 
