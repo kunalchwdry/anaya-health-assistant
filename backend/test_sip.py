@@ -1,5 +1,6 @@
-import os
 import asyncio
+import os
+
 import aiohttp
 from dotenv import load_dotenv
 from livekit.api import sip_service
@@ -31,7 +32,7 @@ async def main():
             api_secret,
         )
 
-        request = sip.ListSIPOutboundTrunkRequest()
+        sip.ListSIPOutboundTrunkRequest()
 
         result = await svc.list_outbound_trunk(
     		sip.ListSIPOutboundTrunkRequest()

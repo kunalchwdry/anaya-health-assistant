@@ -1,9 +1,9 @@
-import os
 import asyncio
+import os
+
 import aiohttp
 from dotenv import load_dotenv
-from livekit.api import sip_service, agent_dispatch_service
-
+from livekit.api import agent_dispatch_service, sip_service
 
 ROOM_NAME = "anaya-outbound-test"
 AGENT_NAME = "Anaya"

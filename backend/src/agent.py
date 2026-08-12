@@ -4,7 +4,6 @@ from datetime import datetime, timezone
 
 import httpx
 from dotenv import load_dotenv
-
 from livekit import rtc
 from livekit.agents import (
     Agent,
@@ -15,20 +14,19 @@ from livekit.agents import (
     RunContext,
     cli,
     function_tool,
-    tokenize,
     room_io,
+    tokenize,
 )
 from livekit.plugins import (
-    murf,
-    silero,
-    google,
     deepgram,
+    google,
+    murf,
     noise_cancellation,
+    silero,
 )
 from livekit.plugins.turn_detector.multilingual import MultilingualModel
 
 import memory
-
 
 logger = logging.getLogger("agent")
 
@@ -234,11 +232,7 @@ class Assistant(Agent):
     # ========================================================
 
     @function_tool
-    async def lookup_user(
-        self,
-        context: RunContext,
-    ) -> str:
-
+    async def lookup_user(self, context: RunContext) -> str:
         user_id = self._resolve_stable_user_id()
 
         if not user_id:
@@ -254,7 +248,7 @@ class Assistant(Agent):
             f"name={record.name or 'unknown'}, "
             f"language={record.language_preference or 'unknown'}, "
             f"facts={record.facts}"
-        )
+    )
 
     # ========================================================
     # DAY 4 — SAVE MEMORY
@@ -758,9 +752,11 @@ out center tags;
             user_id,
         )
 
+        logger.info("Returning full reference_id %s to caller", reference_id)
+
         return (
             f"Escalation created successfully. "
-            f"Reference ID: ESC-{reference_id[:8].upper()}"
+            f"Reference ID: {reference_id}"
         )
 
     @function_tool
