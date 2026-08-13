@@ -3,6 +3,8 @@ import logging
 from datetime import datetime, timezone
 
 import httpx
+import uuid
+import sqlite3
 from dotenv import load_dotenv
 from livekit import rtc
 from livekit.agents import (
@@ -25,18 +27,15 @@ from livekit.plugins import (
     silero,
 )
 from livekit.plugins.turn_detector.multilingual import MultilingualModel
-
 import memory
 
 logger = logging.getLogger("agent")
 
 load_dotenv(".env.local")
 
-
 # ============================================================
 # SYSTEM PROMPT
 # ============================================================
-
 SYSTEM_PROMPT = """
 CREATOR
 
@@ -46,14 +45,12 @@ If someone asks who created you, answer:
 
 "Kunal Choudhary created me."
 
-
 IDENTITY
 
 You are Anaya, a friendly Health Access voice assistant built for Voice of Bharat.
 
 Your main purpose is to make basic health information and healthcare
 facility discovery easier through natural voice conversations.
-
 
 RESPONSE STYLE
 
@@ -62,7 +59,6 @@ Keep responses short and conversational.
 Usually answer in 1-3 sentences.
 
 Be:
-
 - friendly
 - calm
 - concise
@@ -73,13 +69,11 @@ Mirror the user's language.
 
 If the caller speaks Hindi-English, respond naturally in Hindi-English.
 
-
 HEALTH SAFETY
 
 You can provide general health and wellness information.
 
 You can explain:
-
 - common symptoms
 - prevention
 - hygiene
@@ -90,23 +84,18 @@ You can explain:
 You are not a doctor.
 
 Do not diagnose diseases.
-
 Do not prescribe medicines.
-
 Do not recommend prescription drugs.
 
 If a situation sounds serious or dangerous, encourage the caller
 to speak with a qualified healthcare professional.
 
-
 DAY 5 — HEALTH FACILITY SEARCH
 
 You have a tool called:
-
 find_health_facilities
 
 Use this tool when the caller asks to:
-
 - find hospitals
 - find clinics
 - find health centres
@@ -127,7 +116,6 @@ Never invent healthcare facility names.
 The tool searches real OpenStreetMap data.
 
 When results are returned:
-
 - mention the facility names naturally
 - mention that the information comes from OpenStreetMap
 - mention when the data was retrieved
@@ -141,7 +129,6 @@ Do not invent facilities.
 
 Tell the caller that the lookup is temporarily unavailable
 and suggest trying again.
-
 
 DATA SOURCE
 
@@ -165,12 +152,13 @@ Never read raw database information aloud.
 
 Only save personal information after explicit permission.
 
+
 DAY 7 — HUMAN-HELP ESCALATION
 
 You have a tool called:
 create_escalation
 
-Use it when the caller explicitly agrees to create a human-help escalation
+Use it when the caller explicitly agrees to creating the escalation
 request after you have provided appropriate safety guidance.
 
 IMPORTANT:
@@ -188,8 +176,12 @@ IMPORTANT:
 - If an escalation already exists for the caller and the caller asks to create
   another one, avoid unnecessary duplicate requests and explain that an
   existing request is already open when the tool/data supports that conclusion.
-"""
 
+TAKE NOTE: The user will say "continue" to indicate they are ready for you
+to attempt completion
+
+
+"""
 
 # ============================================================
 # ASSISTANT
@@ -248,7 +240,7 @@ class Assistant(Agent):
             f"name={record.name or 'unknown'}, "
             f"language={record.language_preference or 'unknown'}, "
             f"facts={record.facts}"
-    )
+        )
 
     # ========================================================
     # DAY 4 — SAVE MEMORY
@@ -332,7 +324,6 @@ class Assistant(Agent):
     ) -> str:
 
         """
-        Find hospitals and clinics near a location.
 
         DAY 5 FLOW:
 
@@ -363,9 +354,9 @@ class Assistant(Agent):
 
         try:
 
-            # =================================================
+            # ---------------------------------------------===
             # HTTP CLIENT
-            # =================================================
+            # ---------------------------------------------===
 
             async with httpx.AsyncClient(
                 timeout=httpx.Timeout(
@@ -400,6 +391,8 @@ class Assistant(Agent):
                 )
 
                 geo_response.raise_for_status()
+
+                geo_response.json()
 
                 locations = geo_response.json()
 
@@ -437,13 +430,11 @@ class Assistant(Agent):
 
                 overpass_query = f"""
 [out:json][timeout:15];
-
 (
   nwr["amenity"="hospital"](around:5000,{latitude},{longitude});
   nwr["amenity"="clinic"](around:5000,{latitude},{longitude});
   nwr["amenity"="doctors"](around:5000,{latitude},{longitude});
 );
-
 out center tags;
 """
 
@@ -539,9 +530,9 @@ out center tags;
                         "Please try again in a little while."
                     )
 
-            # =================================================
+            # =============================================
             # 5. EXTRACT FACILITIES
-            # =================================================
+            # =============================================
 
             facilities = []
 
@@ -577,9 +568,9 @@ out center tags;
                 len(facilities),
             )
 
-            # =================================================
+            # =============================================
             # 6. REMOVE DUPLICATES
-            # =================================================
+            # =============================================
 
             unique_facilities = []
 
@@ -598,9 +589,9 @@ out center tags;
                     facility
                 )
 
-            # =================================================
+            # =============================================
             # 7. LIMIT RESULTS FOR VOICE
-            # =================================================
+            # =============================================
 
             unique_facilities = unique_facilities[:5]
 
@@ -609,9 +600,9 @@ out center tags;
                 len(unique_facilities),
             )
 
-            # =================================================
+            # =============================================
             # 8. NO RESULTS
-            # =================================================
+            # =============================================
 
             if not unique_facilities:
 
@@ -621,9 +612,9 @@ out center tags;
                     "The OpenStreetMap data may be incomplete."
                 )
 
-            # =================================================
+            # =============================================
             # 9. BUILD VOICE RESPONSE
-            # =================================================
+            # =============================================
 
             facility_text = "; ".join(
                 f"{facility['name']} "
@@ -694,7 +685,6 @@ out center tags;
             )
 
         except Exception:
-
             logger.exception(
                 "DAY 5 unexpected lookup error"
             )
@@ -705,97 +695,6 @@ out center tags;
                 "I don't want to guess, so please "
                 "try the search again."
             )
-
-
-    # ========================================================
-    # DAY 7 — HUMAN-HELP ESCALATION
-    # ========================================================
-
-    @function_tool
-    async def create_escalation(
-        self,
-        context: RunContext,
-        reason: str,
-        summary: str,
-        urgency: str,
-        language: str,
-        follow_up_method: str,
-        status: str = "open",
-    ) -> str:
-        """
-        Create a human-help escalation request.
-
-        This tool must only be called after the caller has explicitly
-        consented to creating the escalation.
-        """
-        user_id = self._resolve_stable_user_id()
-
-        if not user_id:
-            return "Cannot create escalation: caller identity is unavailable."
-
-        reference_id = memory.create_escalation(
-            user_id=user_id,
-            reason=reason,
-            summary=summary,
-            urgency=urgency,
-            language=language,
-            follow_up_method=follow_up_method,
-            status=status,
-        )
-
-        if not reference_id:
-            return "I could not create the escalation request right now. Please try again."
-
-        logger.info(
-            "Created human-help escalation reference_id=%s user_id=%s",
-            reference_id,
-            user_id,
-        )
-
-        logger.info("Returning full reference_id %s to caller", reference_id)
-
-        return (
-            f"Escalation created successfully. "
-            f"Reference ID: {reference_id}"
-        )
-
-    @function_tool
-    async def list_open_escalations(
-        self,
-        context: RunContext,
-    ) -> str:
-        """
-        Return open escalation requests for the current caller.
-
-        This is intended for internal agent use. Never read raw database
-        information aloud to the caller.
-        """
-        user_id = self._resolve_stable_user_id()
-
-        if not user_id:
-            return "No caller identity available."
-
-        try:
-            with memory._connect() as conn:
-                rows = conn.execute(
-                    """
-                    SELECT reference_id, user_id, reason, urgency,
-                           language, follow_up_method, status, created_at
-                    FROM escalations
-                    WHERE user_id = ? AND status = 'open'
-                    ORDER BY created_at DESC
-                    """,
-                    (user_id,),
-                ).fetchall()
-
-            return json.dumps([dict(row) for row in rows], indent=2)
-
-        except Exception as error:
-            logger.exception(
-                "Failed to list open escalations: %s",
-                error,
-            )
-            return json.dumps({"error": str(error)})
 
 
 # ============================================================
@@ -817,7 +716,6 @@ def build_instructions(
         for key, value in facts.items():
 
             if value:
-
                 useful_facts.append(
                     f"- {key}: {value}"
                 )
@@ -867,22 +765,17 @@ def build_instructions(
 
 server = AgentServer()
 
-
 # ============================================================
 # PREWARM
 # ============================================================
 
 def prewarm(proc: JobProcess):
-
     proc.userdata["vad"] = silero.VAD.load()
-
     memory.init_db()
     memory.init_escalations_db()
-
     logger.info(
         "Memory and escalation databases initialized"
     )
-
 
 server.setup_fnc = prewarm
 
@@ -897,7 +790,6 @@ server.setup_fnc = prewarm
 async def my_agent(
     ctx: JobContext,
 ):
-
     ctx.log_context_fields = {
         "room": ctx.room.name,
     }
@@ -910,12 +802,10 @@ async def my_agent(
 
     # --------------------------------------------------------
     # DAY 4 — SESSION MEMORY
-    # --------------------------------------------------------
-
+    # ========================================================
     existing_record: memory.UserMemory | None = None
 
     try:
-
         participant = await ctx.wait_for_participant()
 
         user_id = participant.identity
@@ -940,7 +830,6 @@ async def my_agent(
         )
 
     except Exception:
-
         logger.exception(
             "Session-start memory lookup failed"
         )
@@ -950,15 +839,12 @@ async def my_agent(
     # --------------------------------------------------------
 
     session = AgentSession(
-
         stt=deepgram.STT(
             model="nova-3",
         ),
-
         llm=google.LLM(
             model="gemini-3.5-flash-lite",
         ),
-
         tts=murf.TTS(
             voice="Anisha",
             locale="en-IN",
@@ -968,33 +854,124 @@ async def my_agent(
             ),
             text_pacing=True,
         ),
-
         turn_detection=MultilingualModel(),
-
         vad=ctx.proc.userdata["vad"],
-
         preemptive_generation=True,
     )
 
     # --------------------------------------------------------
-    # START SESSION
+    # DAY 8 — CALL ANALYTICS
     # --------------------------------------------------------
+    call_id = uuid.uuid4().hex
+    started_at = datetime.now(timezone.utc)
+    channel = "browser"
+    success_flag = 0
+    analytics_recorded = False
+
+    def record_analytics(
+        ended_at: datetime,
+        *,
+        success: int,
+        failure_reason: str | None = None,
+    ) -> None:
+        """Record exactly one analytics row for this LiveKit session."""
+        nonlocal analytics_recorded
+
+        if analytics_recorded:
+            logger.info(
+                "Analytics already recorded for call %s, skipping",
+                call_id,
+            )
+            return
+
+        db_path = r"D:\Projects\murf-livekit-starter\call_analytics_dashboard\calls.db"
+
+        try:
+            with sqlite3.connect(db_path) as conn:
+                conn.execute(
+                    """
+                    INSERT OR IGNORE INTO calls (
+                        call_id,
+                        started_at,
+                        ended_at,
+                        duration_seconds,
+                        channel,
+                        success,
+                        failure_reason
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        call_id,
+                        started_at.isoformat(),
+                        ended_at.isoformat(),
+                        (ended_at - started_at).total_seconds(),
+                        channel,
+                        int(success),
+                        failure_reason,
+                    ),
+                )
+                conn.commit()
+
+            analytics_recorded = True
+            logger.info(
+                "Analytics recorded: call_id=%s success=%s",
+                call_id,
+                success,
+            )
+        except Exception:
+            logger.exception(
+                "Failed to save call analytics for call_id=%s",
+                call_id,
+            )
+
+    @session.on("close")
+    def _on_session_close(ev) -> None:
+        """Finalize analytics when the AgentSession closes."""
+        ended_at = datetime.now(timezone.utc)
+
+        reason = getattr(ev, "reason", None)
+        reason_value = getattr(reason, "value", str(reason)).lower()
+
+        # For Day 8, treat a normal session termination as successful.
+        # Explicit error/failed reasons are recorded as failures.
+        failure_reasons = {
+            "error",
+            "failed",
+            "internal_error",
+            "server_error",
+            "timeout",
+            "assignment_timeout",
+            "cancelled",
+        }
+
+        if reason_value in failure_reasons:
+            success = 0
+            failure_reason = reason_value
+        else:
+            success = 1
+            failure_reason = None
+
+        record_analytics(
+            ended_at,
+            success=success,
+            failure_reason=failure_reason,
+        )
+
+    # ============================================================
+    # START SESSION — EXACTLY ONCE
+    # ============================================================
 
     await session.start(
-
         agent=Assistant(
             ctx=ctx,
             instructions=build_instructions(
                 existing_record
             ),
         ),
-
         room=ctx.room,
-
         room_options=room_io.RoomOptions(
-
             audio_input=room_io.AudioInputOptions(
-
                 noise_cancellation=lambda params: (
                     noise_cancellation.BVCTelephony()
                     if (

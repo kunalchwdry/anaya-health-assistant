@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Anaya Call Analytics</title>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            font-family: Arial, sans-serif;
+            background: #0f172a;
+            color: white;
+            padding: 40px;
+        }
+
+        .container {
+            max-width: 1100px;
+            margin: auto;
+        }
+
+        h1 {
+            margin-bottom: 8px;
+        }
+
+        .subtitle {
+            color: #94a3b8;
+            margin-bottom: 30px;
+        }
+
+        .cards {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 18px;
+        }
+
+        .card {
+            background: #1e293b;
+            border-radius: 16px;
+            padding: 24px;
+            border: 1px solid #334155;
+        }
+
+        .label {
+            color: #94a3b8;
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
+
+        .value {
+            font-size: 38px;
+            font-weight: bold;
+        }
+
+        .chart-container {
+            margin-top: 30px;
+            background: #1e293b;
+            border-radius: 16px;
+            padding: 24px;
+            border: 1px solid #334155;
+        }
+
+        @media (max-width: 800px) {
+            .cards {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+
+        @media (max-width: 500px) {
+            .cards {
+                grid-template-columns: 1fr;
+            }
+
+            body {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+<div class="container">
+
+    <h1>ANAYA — CALL ANALYTICS</h1>
+    <div class="subtitle">Health Access • Day 8</div>
+
+    <div class="cards">
+        <div class="card">
+            <div class="label">TOTAL CALLS</div>
+            <div class="value" id="total">0</div>
+        </div>
+
+        <div class="card">
+            <div class="label">SUCCESSFUL CALLS</div>
+            <div class="value" id="success">0</div>
+        </div>
+
+        <div class="card">
+            <div class="label">FAILED CALLS</div>
+            <div class="value" id="failed">0</div>
+        </div>
+
+        <div class="card">
+            <div class="label">SUCCESS RATE</div>
+            <div class="value" id="success-rate">0%</div>
+        </div>
+    </div>
+
+    <div class="chart-container">
+        <canvas id="callsChart"></canvas>
+    </div>
+
+</div>
+
+<script>
+    let chart;
+
+    async function loadMetrics() {
+        try {
+            const response = await fetch("/metrics");
+            const data = await response.json();
+
+            document.getElementById("total").textContent = data.total;
+            document.getElementById("success").textContent = data.success;
+            document.getElementById("failed").textContent = data.failed;
+            document.getElementById("success-rate").textContent =
+                `${data.success_rate}%`;
+
+            updateChart(data);
+        } catch (error) {
+            console.error("Failed to load metrics:", error);
+        }
+    }
+
+    function updateChart(data) {
+        const ctx = document.getElementById("callsChart");
+
+        if (chart) {
+            chart.destroy();
+        }
+
+        chart = new Chart(ctx, {
+            type: "bar",
+            data: {
+                labels: ["Total", "Successful", "Failed"],
+                datasets: [{
+                    label: "Calls",
+                    data: [
+                        data.total,
+                        data.success,
+                        data.failed
+                    ]
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            precision: 0
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    loadMetrics();
+
+    // Refresh every 5 seconds.
+    setInterval(loadMetrics, 5000);
+</script>
+
+</body>
+</html>

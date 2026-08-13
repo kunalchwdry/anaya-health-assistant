@@ -1,0 +1,17 @@
+CREATE TABLE IF NOT EXISTS calls (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    call_id TEXT UNIQUE NOT NULL,
+    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+    started_at DATETIME,
+    ended_at DATETIME,
+    duration_seconds REAL,
+    channel TEXT NOT NULL,
+    success INTEGER NOT NULL,
+    failure_reason TEXT
+);
+</parameter>
+<task_progress>
+- [x] Create SQLite database with calls table (with proper schema)
+</task_progress>
+</write_to_file>
+</tool_call>
