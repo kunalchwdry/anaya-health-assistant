@@ -1,10 +1,9 @@
-import json
 import logging
+import sqlite3
+import uuid
 from datetime import datetime, timezone
 
 import httpx
-import uuid
-import sqlite3
 from dotenv import load_dotenv
 from livekit import rtc
 from livekit.agents import (
@@ -27,6 +26,7 @@ from livekit.plugins import (
     silero,
 )
 from livekit.plugins.turn_detector.multilingual import MultilingualModel
+
 import memory
 
 logger = logging.getLogger("agent")
@@ -34,8 +34,10 @@ logger = logging.getLogger("agent")
 load_dotenv(".env.local")
 
 # ============================================================
-# SYSTEM PROMPT
+# SYSTEM PROMPTS
 # ============================================================
+
+# Main Anaya agent system prompt
 SYSTEM_PROMPT = """
 CREATOR
 
@@ -177,14 +179,155 @@ IMPORTANT:
   another one, avoid unnecessary duplicate requests and explain that an
   existing request is already open when the tool/data supports that conclusion.
 
+DAY 9 — CLINIC & APPOINTMENT SPECIALIST HANDOFF
+
+You have a tool called:
+handoff_to_clinic_specialist
+
+Use this tool when the caller specifically needs help with:
+- finding a clinic or healthcare facility
+- locating healthcare facilities
+- clinic information and details
+- appointment-related help (booking, preparing, rescheduling)
+- preparing for a clinic appointment
+- navigating healthcare services
+- clinic logistics (what to bring, documents needed, etc.)
+
+Do NOT use this tool for:
+- General health questions (symptoms, wellness, prevention)
+- Medical information requests
+- Non-clinic related health topics
+- When the caller just wants general health advice
+
+When you call this tool, the tool will automatically announce the handoff to the caller and transfer them to the specialist. The specialist will receive the conversation context and continue naturally from where you left off.
+
 TAKE NOTE: The user will say "continue" to indicate they are ready for you
 to attempt completion
 
 
 """
 
+# Clinic & Appointment Specialist system prompt
+CLINIC_SPECIALIST_PROMPT = """
+CREATOR
+
+You were created by Kunal Choudhary.
+
+IDENTITY
+
+You are Alex, Anaya's Clinic & Appointment Specialist — a focused voice agent
+that helps callers with clinic discovery, appointment preparation,
+and healthcare navigation.
+
+You are part of the Anaya Voice of Bharat system.
+
+Your role is narrower than Anaya's: you ONLY handle clinic and
+appointment related requests.
+
+When introducing yourself, say:
+"Hi, I'm Alex, Anaya's clinic and appointment specialist."
+
+RESPONSE STYLE
+
+Keep responses short and conversational.
+
+Usually answer in 1-3 sentences.
+
+Be:
+- friendly
+- calm
+- concise
+- empathetic
+- natural
+- voice-first
+
+Mirror the user's language.
+
+If the caller speaks Hindi-English, respond naturally in Hindi-English.
+
+SCOPE — WHAT YOU HANDLE
+
+- Helping callers find clinics, hospitals, PHCs, and health centres
+- Guiding callers on what to expect during a clinic visit
+- Helping callers prepare for appointments (documents, questions, history)
+- Explaining typical clinic processes (registration, consultation, follow-up)
+- Navigating healthcare services (referrals, specialists, departments)
+- General clinic logistics (timings, what to bring, fees overview)
+
+SCOPE — WHAT YOU DO NOT HANDLE
+
+- General health questions (symptoms, wellness, prevention) — those stay with Anaya
+- Medical diagnosis or treatment advice — NEVER diagnose or prescribe
+- Claiming appointments are booked without real confirmation
+- Inventing clinic availability or services
+- Replacing doctors or healthcare professionals
+
+HEALTH SAFETY
+
+You are not a doctor.
+
+Do not diagnose diseases.
+Do not prescribe medicines.
+Do not recommend prescription drugs.
+
+If a situation sounds serious or dangerous, encourage the caller
+to speak with a qualified healthcare professional immediately.
+
+If the caller asks about symptoms or general health, gently guide them
+back to Anaya for that discussion.
+
+CLINIC FACILITY SEARCH
+
+You have access to the same find_health_facilities tool as Anaya.
+
+Use it when the caller asks to find clinics, hospitals, or healthcare
+facilities in a specific location.
+
+Follow the same guidelines: never invent names, cite OpenStreetMap,
+mention data may be incomplete.
+
+APPOINTMENT GUIDANCE
+
+When helping with appointments:
+- Ask what type of appointment (general check-up, specialist, follow-up)
+- Suggest what documents to bring (ID, insurance, medical records, medication list)
+- Suggest questions to ask the doctor
+- Explain typical clinic flow (registration → vitals → consultation → follow-up)
+- Remind the caller to confirm timings and availability directly with the clinic
+- Never claim an appointment is confirmed without explicit confirmation
+
+CONVERSATION CONTEXT
+
+You receive the conversation context from Anaya during handoff.
+
+Use this context to continue naturally — do NOT ask the caller to
+repeat what they already told Anaya.
+
+When you first take over after handoff, respond with:
+"Hi, I'm Alex, Anaya's clinic and appointment specialist. I can help you with your appointment. What kind of appointment are you looking for, and what city or area are you in?"
+
+ESCALATION BACK TO ANAYA
+
+If the caller shifts to a general health topic (symptoms, wellness, etc.),
+politely let them know that Anaya is better suited for that and offer
+to transfer back, or simply handle the clinic part and let Anaya
+resume naturally if the architecture supports it.
+
+MEMORY
+
+You have access to the same memory tools.
+
+Use them when appropriate for returning callers.
+
+Never read raw database information aloud.
+
+Only save personal information after explicit permission.
+
+"""
+
+
 # ============================================================
-# ASSISTANT
+# ASSISTANT (Main Anaya Agent)
 # ============================================================
 
 class Assistant(Agent):
@@ -313,6 +456,62 @@ class Assistant(Agent):
         return "Your stored information has been deleted."
 
     # ========================================================
+    # DAY 9 — HANDOFF TO CLINIC SPECIALIST
+    # ========================================================
+
+    @function_tool
+    async def handoff_to_clinic_specialist(
+        self,
+        context: RunContext,
+        reason: str,
+    ) -> str:
+        """
+        Handoff the conversation to the Clinic & Appointment Specialist.
+
+        Args:
+            reason: A brief description of why the handoff is needed
+                    (e.g., "caller needs help finding a clinic for a general check-up")
+
+        This tool should be called when the user specifically needs:
+        - clinic discovery or healthcare facility location
+        - appointment assistance (booking, preparing, rescheduling)
+        - clinic information and logistics
+        - navigating healthcare services
+        """
+        # Announce the handoff (only once, here in the tool)
+        await self.session.say(
+            "I'll connect you with Alex, our clinic and appointment specialist."
+        )
+
+        # Build handoff context from the reason
+        handoff_context = (
+            f"The caller was transferred from Anaya for: {reason}. "
+            f"Continue naturally from this context."
+        )
+
+        # Create the specialist agent
+        specialist = ClinicAppointmentSpecialist(
+            ctx=self._job_ctx,
+            instructions=build_specialist_instructions(
+                self._get_user_memory(), handoff_context
+            ),
+            handoff_context=handoff_context,
+        )
+
+        # Switch to the specialist agent
+        self.session.update_agent(specialist)
+
+        logger.info("Handoff to clinic specialist completed: %s", reason)
+        return "Handoff completed successfully."
+
+    def _get_user_memory(self):
+        """Get the current user's memory record."""
+        user_id = self._resolve_stable_user_id()
+        if user_id:
+            return memory.get_user(user_id)
+        return None
+
+    # ========================================================
     # DAY 5 — HEALTH FACILITY LOOKUP
     # ========================================================
 
@@ -324,7 +523,526 @@ class Assistant(Agent):
     ) -> str:
 
         """
+        DAY 5 FLOW:
 
+        1. Geocode location with Nominatim.
+        2. Query OpenStreetMap through Overpass.
+        3. Extract hospital and clinic names.
+        4. Remove duplicates.
+        5. Return a short voice-friendly response.
+        """
+
+        # ----------------------------------------------------
+        # VALIDATE LOCATION
+        # ----------------------------------------------------
+
+        if not location or not location.strip():
+
+            return (
+                "Please tell me your city or area "
+                "so I can search for nearby health facilities."
+            )
+
+        location = location.strip()
+
+        logger.info(
+            "DAY 5 health facility lookup: %s",
+            location,
+        )
+
+        try:
+
+            # ---------------------------------------------===
+            # HTTP CLIENT
+            # ---------------------------------------------===
+
+            async with httpx.AsyncClient(
+                timeout=httpx.Timeout(
+                    connect=8.0,
+                    read=15.0,
+                    write=15.0,
+                    pool=8.0,
+                ),
+                follow_redirects=True,
+            ) as client:
+
+                # =============================================
+                # 1. GEOCODING
+                # =============================================
+
+                logger.info(
+                    "DAY 5: geocoding location=%s",
+                    location,
+                )
+
+                geo_response = await client.get(
+                    "https://nominatim.openstreetmap.org/search",
+                    params={
+                        "q": location,
+                        "format": "jsonv2",
+                        "limit": 1,
+                    },
+                    headers={
+                        "User-Agent":
+                            "Anaya-Health-Access-Demo/1.0"
+                    },
+                )
+
+                geo_response.raise_for_status()
+
+                geo_response.json()
+
+                locations = geo_response.json()
+
+                if not locations:
+
+                    logger.warning(
+                        "DAY 5: location not found: %s",
+                        location,
+                    )
+
+                    return (
+                        f"I couldn't find {location} "
+                        "in the map data. "
+                        "Please try a nearby city or area."
+                    )
+
+                latitude = float(
+                    locations[0]["lat"]
+                )
+
+                longitude = float(
+                    locations[0]["lon"]
+                )
+
+                logger.info(
+                    "Geocoded %s -> %s, %s",
+                    location,
+                    latitude,
+                    longitude,
+                )
+
+                # =============================================
+                # 2. BUILD OVERPASS QUERY
+                # =============================================
+
+                overpass_query = f"""
+[out:json][timeout:15];
+(
+  nwr["amenity"="hospital"](around:5000,{latitude},{longitude});
+  nwr["amenity"="clinic"](around:5000,{latitude},{longitude});
+  nwr["amenity"="doctors"](around:5000,{latitude},{longitude});
+);
+out center tags;
+"""
+
+                logger.info(
+                    "DAY 5: querying Overpass"
+                )
+
+                # =============================================
+                # 3. TRY MULTIPLE OVERPASS SERVERS
+                # =============================================
+
+                overpass_endpoints = [
+                    "https://overpass.private.coffee/api/interpreter",
+                    "https://overpass.kumi.systems/api/interpreter",
+                    "https://overpass-api.de/api/interpreter",
+                ]
+
+                data = None
+
+                for endpoint in overpass_endpoints:
+
+                    try:
+
+                        logger.info(
+                            "DAY 5: trying Overpass endpoint=%s",
+                            endpoint,
+                        )
+
+                        osm_response = await client.post(
+                            endpoint,
+                            content=overpass_query,
+                            headers={
+                                "User-Agent":
+                                    "Anaya-Health-Access-Demo/1.0",
+                                "Content-Type":
+                                    "text/plain",
+                            },
+                        )
+
+                        osm_response.raise_for_status()
+
+                        data = osm_response.json()
+
+                        logger.info(
+                            "DAY 5: Overpass success endpoint=%s",
+                            endpoint,
+                        )
+
+                        break
+
+                    except httpx.TimeoutException:
+
+                        logger.warning(
+                            "DAY 5: Overpass timeout endpoint=%s",
+                            endpoint,
+                        )
+
+                        continue
+
+                    except httpx.HTTPStatusError as error:
+
+                        logger.warning(
+                            "DAY 5: Overpass HTTP error endpoint=%s status=%s",
+                            endpoint,
+                            error.response.status_code,
+                        )
+
+                        continue
+
+                    except httpx.RequestError as error:
+
+                        logger.warning(
+                            "DAY 5: Overpass network error endpoint=%s error=%s",
+                            endpoint,
+                            error,
+                        )
+
+                        continue
+
+                # =============================================
+                # 4. ALL OVERPASS SERVERS FAILED
+                # =============================================
+
+                if data is None:
+
+                    logger.warning(
+                        "DAY 5: all Overpass endpoints failed"
+                    )
+
+                    return (
+                        "The health facility lookup is temporarily "
+                        "unavailable right now. "
+                        "Please try again in a little while."
+                    )
+
+            # =============================================
+            # 5. EXTRACT FACILITIES
+            # =============================================
+
+            facilities = []
+
+            for element in data.get(
+                "elements",
+                [],
+            ):
+
+                tags = element.get(
+                    "tags",
+                    {},
+                )
+
+                name = tags.get("name")
+
+                if not name:
+                    continue
+
+                facility_type = tags.get(
+                    "amenity",
+                    "health facility",
+                )
+
+                facilities.append(
+                    {
+                        "name": name.strip(),
+                        "type": facility_type,
+                    }
+                )
+
+            logger.info(
+                "DAY 5: raw facilities found=%d",
+                len(facilities),
+            )
+
+            # =============================================
+            # 6. REMOVE DUPLICATES
+            # =============================================
+
+            unique_facilities = []
+
+            seen = set()
+
+            for facility in facilities:
+
+                key = facility["name"].lower()
+
+                if key in seen:
+                    continue
+
+                seen.add(key)
+
+                unique_facilities.append(
+                    facility
+                )
+
+            # =============================================
+            # 7. LIMIT RESULTS FOR VOICE
+            # =============================================
+
+            unique_facilities = unique_facilities[:5]
+
+            logger.info(
+                "DAY 5: unique facilities returned=%d",
+                len(unique_facilities),
+            )
+
+            # =============================================
+            # 8. NO RESULTS
+            # =============================================
+
+            if not unique_facilities:
+
+                return (
+                    f"I couldn't find mapped hospitals or clinics "
+                    f"near {location}. "
+                    "The OpenStreetMap data may be incomplete."
+                )
+
+            # =============================================
+            # 9. BUILD VOICE RESPONSE
+            # =============================================
+
+            facility_text = "; ".join(
+                f"{facility['name']} "
+                f"({facility['type']})"
+                for facility in unique_facilities
+            )
+
+            retrieved_at = datetime.now(
+                timezone.utc
+            ).strftime(
+                "%d %B %Y at %H:%M UTC"
+            )
+
+            logger.info(
+                "DAY 5: successful lookup for %s",
+                location,
+            )
+
+            return (
+                f"I found {len(unique_facilities)} mapped "
+                f"health facilities near {location}: "
+                f"{facility_text}. "
+                f"This information comes from OpenStreetMap "
+                f"and was retrieved on {retrieved_at}. "
+                "The map data may be incomplete or outdated."
+            )
+
+        # ====================================================
+        # FAILURE HANDLING
+        # ====================================================
+
+        except httpx.TimeoutException:
+
+            logger.warning(
+                "DAY 5 lookup timed out"
+            )
+
+            return (
+                "The health facility lookup is taking "
+                "too long right now. "
+                "Please try again in a moment."
+            )
+
+        except httpx.HTTPStatusError as error:
+
+            logger.error(
+                "DAY 5 HTTP error: %s",
+                error,
+            )
+
+            return (
+                "I couldn't access the health facility "
+                "data right now. "
+                "Please try again later."
+            )
+
+        except httpx.RequestError as error:
+
+            logger.error(
+                "DAY 5 network error: %s",
+                error,
+            )
+
+            return (
+                "I'm having trouble connecting to the "
+                "health facility data right now. "
+                "Please try again later."
+            )
+
+        except Exception:
+            logger.exception(
+                "DAY 5 unexpected lookup error"
+            )
+
+            return (
+                "Something went wrong while searching "
+                "for health facilities. "
+                "I don't want to guess, so please "
+                "try the search again."
+            )
+
+
+# ============================================================
+# CLINIC APPOINTMENT SPECIALIST AGENT
+# ============================================================
+
+class ClinicAppointmentSpecialist(Agent):
+    """Specialist agent for clinic discovery, appointment preparation, and healthcare navigation."""
+
+    def __init__(
+        self,
+        ctx: JobContext | None = None,
+        instructions: str | None = None,
+        handoff_context: str | None = None,
+    ) -> None:
+        # Build instructions with handoff context if provided
+        final_instructions = instructions or CLINIC_SPECIALIST_PROMPT
+        if handoff_context:
+            final_instructions = final_instructions + "\n\nHANDOFF CONTEXT:\n" + handoff_context
+
+        super().__init__(
+            instructions=final_instructions
+        )
+
+        self._job_ctx = ctx
+        self._handoff_context = handoff_context
+
+    # ========================================================
+    # RESOLVE USER ID (same as Assistant)
+    # ========================================================
+
+    def _resolve_stable_user_id(self) -> str | None:
+
+        if self._job_ctx is None:
+            return None
+
+        participants = list(
+            self._job_ctx.room.remote_participants.values()
+        )
+
+        if not participants:
+            return None
+
+        return participants[0].identity or None
+
+    # ========================================================
+    # DAY 4 — LOOKUP MEMORY
+    # ========================================================
+
+    @function_tool
+    async def lookup_user(self, context: RunContext) -> str:
+        user_id = self._resolve_stable_user_id()
+
+        if not user_id:
+            return "No caller identity available."
+
+        record = memory.get_user(user_id)
+
+        if record is None:
+            return "No stored memory for this caller."
+
+        return (
+            f"Returning caller. "
+            f"name={record.name or 'unknown'}, "
+            f"language={record.language_preference or 'unknown'}, "
+            f"facts={record.facts}"
+        )
+
+    # ========================================================
+    # DAY 4 — SAVE MEMORY
+    # ========================================================
+
+    @function_tool
+    async def save_user_memory(
+        self,
+        context: RunContext,
+        name: str | None = None,
+        language_preference: str | None = None,
+        age_band: str | None = None,
+        ongoing_conditions: str | None = None,
+        last_triage_outcome: str | None = None,
+    ) -> str:
+
+        user_id = self._resolve_stable_user_id()
+
+        if not user_id:
+            return "Could not save because caller identity is unavailable."
+
+        facts = {
+            "age_band": age_band,
+            "ongoing_conditions": ongoing_conditions,
+            "last_triage_outcome": last_triage_outcome,
+        }
+
+        ok = memory.save_user(
+            user_id=user_id,
+            name=name,
+            language_preference=language_preference,
+            facts=facts,
+        )
+
+        if not ok:
+            return "Something went wrong while saving that."
+
+        logger.info(
+            "Memory saved successfully for user=%s",
+            user_id,
+        )
+
+        return "Saved successfully."
+
+    # ========================================================
+    # DAY 4 — FORGET MEMORY
+    # ========================================================
+
+    @function_tool
+    async def forget_my_information(
+        self,
+        context: RunContext,
+    ) -> str:
+
+        user_id = self._resolve_stable_user_id()
+
+        if not user_id:
+            return "Caller identity is unavailable."
+
+        ok = memory.delete_user(user_id)
+
+        if not ok:
+            return "Something went wrong while deleting the information."
+
+        logger.info(
+            "Memory deleted for user=%s",
+            user_id,
+        )
+
+        return "Your stored information has been deleted."
+
+    # ========================================================
+    # DAY 5 — HEALTH FACILITY LOOKUP (shared with Anaya)
+    # ========================================================
+
+    @function_tool
+    async def find_health_facilities(
+        self,
+        context: RunContext,
+        location: str,
+    ) -> str:
+
+        """
         DAY 5 FLOW:
 
         1. Geocode location with Nominatim.
@@ -759,6 +1477,71 @@ def build_instructions(
     return SYSTEM_PROMPT + caller_context
 
 
+def build_specialist_instructions(
+    existing_record: memory.UserMemory | None,
+    handoff_context: str | None = None,
+) -> str:
+    """Build instructions for the clinic specialist with handoff context."""
+
+    if existing_record:
+
+        name = existing_record.name or "there"
+
+        facts = existing_record.facts or {}
+
+        useful_facts = []
+
+        for key, value in facts.items():
+
+            if value:
+                useful_facts.append(
+                    f"- {key}: {value}"
+                )
+
+        facts_text = "\n".join(
+            useful_facts
+        )
+
+        caller_context = (
+            "\n\n"
+            "CALLER CONTEXT — PRIVATE\n"
+            "Never mention the database or memory tools.\n\n"
+            f"Caller name: {name}\n"
+        )
+
+        if facts_text:
+
+            caller_context += (
+                "Previously saved high-level facts:\n"
+                f"{facts_text}\n"
+            )
+
+        caller_context += (
+            "\nRETURNING CALLER:\n"
+            f"- Greet the caller naturally by name: {name}.\n"
+            "- Do not list everything you remember.\n"
+            "- Use stored information only when relevant.\n"
+            "- Never invent stored information.\n"
+        )
+
+    else:
+
+        caller_context = (
+            "\n\n"
+            "CALLER CONTEXT — PRIVATE\n"
+            "No stored memory was found.\n"
+            "Treat this as a new caller.\n"
+            "Start naturally with a brief greeting.\n"
+        )
+
+    instructions = CLINIC_SPECIALIST_PROMPT + caller_context
+
+    if handoff_context:
+        instructions += f"\n\nHANDOFF CONTEXT:\n{handoff_context}\n\nUse this context to continue naturally. Do not ask the caller to repeat what they already said."
+
+    return instructions
+
+
 # ============================================================
 # SERVER
 # ============================================================
@@ -811,7 +1594,7 @@ async def my_agent(
         user_id = participant.identity
 
         print(
-            "🔥 ANAYA USER ID:",
+            " ANAYA USER ID:",
             repr(user_id),
             flush=True,
         )
@@ -865,7 +1648,6 @@ async def my_agent(
     call_id = uuid.uuid4().hex
     started_at = datetime.now(timezone.utc)
     channel = "browser"
-    success_flag = 0
     analytics_recorded = False
 
     def record_analytics(
@@ -962,13 +1744,14 @@ async def my_agent(
     # START SESSION — EXACTLY ONCE
     # ============================================================
 
+    # Start with the main Anaya agent
+    agent = Assistant(
+        ctx=ctx,
+        instructions=build_instructions(existing_record),
+    )
+
     await session.start(
-        agent=Assistant(
-            ctx=ctx,
-            instructions=build_instructions(
-                existing_record
-            ),
-        ),
+        agent=agent,
         room=ctx.room,
         room_options=room_io.RoomOptions(
             audio_input=room_io.AudioInputOptions(
