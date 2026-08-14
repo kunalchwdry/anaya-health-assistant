@@ -1,11 +1,7 @@
-import { NextResponse } from 'next/server';
-import {
-  AccessToken,
-  type AccessTokenOptions,
-  type VideoGrant,
-} from 'livekit-server-sdk';
-import { RoomConfiguration } from '@livekit/protocol';
 import { cookies } from 'next/headers';
+import { NextResponse } from 'next/server';
+import { AccessToken, type AccessTokenOptions, type VideoGrant } from 'livekit-server-sdk';
+import { RoomConfiguration } from '@livekit/protocol';
 
 type ConnectionDetails = {
   serverUrl: string;
@@ -50,10 +46,7 @@ export async function POST(req: Request) {
     let roomConfig: RoomConfiguration | undefined;
 
     if (body?.room_config) {
-      roomConfig = RoomConfiguration.fromJson(
-        body.room_config,
-        { ignoreUnknownFields: true }
-      );
+      roomConfig = RoomConfiguration.fromJson(body.room_config, { ignoreUnknownFields: true });
     } else if (AGENT_NAME) {
       roomConfig = RoomConfiguration.fromJson(
         {
@@ -69,10 +62,7 @@ export async function POST(req: Request) {
     // The USER ID stays the same.
     const roomName = `voice_assistant_room_${crypto.randomUUID()}`;
 
-    console.log(
-      '🔥 ANAYA STABLE USER ID:',
-      participantIdentity
-    );
+    console.log('🔥 ANAYA STABLE USER ID:', participantIdentity);
 
     const participantToken = await createParticipantToken(
       {

@@ -3,13 +3,9 @@ import clsx from 'clsx';
 
 type WaveformState = 'IDLE' | 'LISTENING' | 'SPEAKING' | 'THINKING';
 
-export const WaveformVisualization = ({
-  state = 'IDLE',
-}: {
-  state?: WaveformState;
-}) => {
+export const WaveformVisualization = ({ state = 'IDLE' }: { state?: WaveformState }) => {
   const [isAnimating, setIsAnimating] = useState(false);
-  
+
   // Trigger animation when state changes
   useEffect(() => {
     if (state !== 'IDLE') {
@@ -28,11 +24,13 @@ export const WaveformVisualization = ({
   };
 
   return (
-    <div className={clsx(baseClass, stateClasses[state], {
-      'opacity-75': state === 'IDLE',
-    })}>
+    <div
+      className={clsx(baseClass, stateClasses[state], {
+        'opacity-75': state === 'IDLE',
+      })}
+    >
       {state !== 'IDLE' && (
-        <div className="absolute inset-0 bg-gradient-to-r from-gray-300 to-transparent rounded opacity-25 animate-pulse" />
+        <div className="absolute inset-0 animate-pulse rounded bg-gradient-to-r from-gray-300 to-transparent opacity-25" />
       )}
     </div>
   );

@@ -2,10 +2,21 @@
 
 import { useEffect, useState } from 'react';
 
+interface Escalation {
+  reference_id: string;
+  reason: string;
+  summary: string;
+  urgency: string;
+  language: string;
+  follow_up_method: string;
+  status: string;
+  created_at: string;
+}
+
 export default function EscalationsDashboard() {
-  const [escalations, setEscalations] = useState([]);
+  const [escalations, setEscalations] = useState<Escalation[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     async function fetchEscalations() {
@@ -14,8 +25,8 @@ export default function EscalationsDashboard() {
         if (!res.ok) throw new Error('Network response was not ok');
         const data = await res.json();
         setEscalations(data);
-      } catch (e) {
-        setError(e.message);
+      } catch (e: unknown) {
+        setError(e instanceof Error ? e.message : 'Unknown error');
       } finally {
         setLoading(false);
       }
@@ -61,6 +72,3 @@ export default function EscalationsDashboard() {
     </div>
   );
 }
-</File>
-</write_to_file>
-</tool_call>

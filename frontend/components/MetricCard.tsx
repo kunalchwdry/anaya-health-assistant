@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import clsx from 'clsx';
 import React from 'react';
+import clsx from 'clsx';
 
 interface MetricCardProps {
   icon: React.ReactNode;
@@ -19,22 +19,21 @@ export const MetricCard = ({
   trendValue = '',
   description = '',
 }: MetricCardProps) => {
-  const trendClass = trend === 'up' 
-    ? 'text-green-600' 
-    : trend === 'down' 
-      ? 'text-red-600' 
-      : 'text-gray-500';
+  const trendClass =
+    trend === 'up' ? 'text-green-600' : trend === 'down' ? 'text-red-600' : 'text-gray-500';
 
   const valueClass = typeof value === 'number' ? 'text-2xl font-bold' : 'text-lg';
 
   return (
-    <div className="bg-white rounded-lg shadow-sm p-4 flex flex-col items-center gap-3">
+    <div className="flex flex-col items-center gap-3 rounded-lg bg-white p-4 shadow-sm">
       <div className="flex items-center gap-2">
         {icon}
-        <span className={trendClass} font-medium>{trendValue}</span>
+        <span className={trendClass} font-medium>
+          {trendValue}
+        </span>
       </div>
       <div className={valueClass}>{value}</div>
-      <div className="text-sm text-gray-500 text-left">{title}</div>
+      <div className="text-left text-sm text-gray-500">{title}</div>
       {description ? <div className="text-sm text-gray-400">{description}</div> : null}
     </div>
   );

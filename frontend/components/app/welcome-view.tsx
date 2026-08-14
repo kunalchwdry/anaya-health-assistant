@@ -1,16 +1,16 @@
 'use client';
 
 import React, { forwardRef } from 'react';
-import { motion } from 'motion/react';
 import {
   Activity,
+  ArrowRight,
   HeartPulse,
   Mic,
   ShieldCheck,
   Sparkles,
   Stethoscope,
-  ArrowRight,
 } from 'lucide-react';
+import { motion } from 'motion/react';
 import { Button } from '@/components/ui/button';
 
 function WelcomeImage() {
@@ -44,15 +44,11 @@ function WelcomeImage() {
       >
         <div className="absolute inset-2 rounded-full border border-white/20" />
 
-        <Stethoscope
-          size={42}
-          strokeWidth={1.7}
-          className="relative text-white"
-        />
+        <Stethoscope size={42} strokeWidth={1.7} className="relative text-white" />
 
         {/* Small AI dot */}
         <motion.div
-          className="absolute right-3 top-3 h-3 w-3 rounded-full bg-emerald-300 shadow-[0_0_15px_rgba(110,231,183,0.9)]"
+          className="absolute top-3 right-3 h-3 w-3 rounded-full bg-emerald-300 shadow-[0_0_15px_rgba(110,231,183,0.9)]"
           animate={{
             opacity: [0.4, 1, 0.4],
           }}
@@ -90,7 +86,7 @@ export const WelcomeView = forwardRef<
 
       {/* Animated cyan glow */}
       <motion.div
-        className="absolute left-1/2 top-[-180px] h-[500px] w-[500px] -translate-x-1/2 rounded-full bg-cyan-500/10 blur-[120px]"
+        className="absolute top-[-180px] left-1/2 h-[500px] w-[500px] -translate-x-1/2 rounded-full bg-cyan-500/10 blur-[120px]"
         animate={{
           scale: [1, 1.15, 1],
           opacity: [0.4, 0.7, 0.4],
@@ -118,7 +114,7 @@ export const WelcomeView = forwardRef<
 
       {/* Blue glow */}
       <motion.div
-        className="absolute bottom-[-180px] right-[-100px] h-[450px] w-[450px] rounded-full bg-blue-600/10 blur-[130px]"
+        className="absolute right-[-100px] bottom-[-180px] h-[450px] w-[450px] rounded-full bg-blue-600/10 blur-[130px]"
         animate={{
           x: [0, -50, 0],
           y: [0, -30, 0],
@@ -144,19 +140,13 @@ export const WelcomeView = forwardRef<
       {/* TOP BRAND */}
       {/* ========================================================= */}
 
-      <div className="absolute left-6 top-6 z-20 flex items-center gap-3 md:left-10 md:top-8">
+      <div className="absolute top-6 left-6 z-20 flex items-center gap-3 md:top-8 md:left-10">
         <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-cyan-300/20 bg-cyan-400/10 shadow-[0_0_25px_rgba(34,211,238,0.12)] backdrop-blur-xl">
-          <HeartPulse
-            size={21}
-            className="text-cyan-300"
-            strokeWidth={2}
-          />
+          <HeartPulse size={21} className="text-cyan-300" strokeWidth={2} />
         </div>
 
         <div>
-          <p className="text-sm font-bold tracking-[0.28em] text-white">
-            ANAYA
-          </p>
+          <p className="text-sm font-bold tracking-[0.28em] text-white">ANAYA</p>
 
           <p className="text-[9px] font-medium tracking-[0.25em] text-cyan-300/70">
             HEALTH ACCESS AI
@@ -165,7 +155,7 @@ export const WelcomeView = forwardRef<
       </div>
 
       {/* Top right status */}
-      <div className="absolute right-6 top-6 z-20 hidden items-center gap-2 rounded-full border border-emerald-400/20 bg-emerald-400/5 px-4 py-2 backdrop-blur-xl md:flex">
+      <div className="absolute top-6 right-6 z-20 hidden items-center gap-2 rounded-full border border-emerald-400/20 bg-emerald-400/5 px-4 py-2 backdrop-blur-xl md:flex">
         <motion.span
           className="h-2 w-2 rounded-full bg-emerald-400"
           animate={{
@@ -177,9 +167,7 @@ export const WelcomeView = forwardRef<
           }}
         />
 
-        <span className="text-xs font-medium text-emerald-300">
-          AI SYSTEM ONLINE
-        </span>
+        <span className="text-xs font-medium text-emerald-300">AI SYSTEM ONLINE</span>
       </div>
 
       {/* ========================================================= */}
@@ -197,7 +185,7 @@ export const WelcomeView = forwardRef<
       >
         <div className="relative overflow-hidden rounded-[32px] border border-white/10 bg-white/[0.045] px-6 py-12 shadow-2xl backdrop-blur-2xl md:px-14 md:py-14">
           {/* Card glow */}
-          <div className="pointer-events-none absolute left-1/2 top-0 h-48 w-96 -translate-x-1/2 rounded-full bg-cyan-400/10 blur-[90px]" />
+          <div className="pointer-events-none absolute top-0 left-1/2 h-48 w-96 -translate-x-1/2 rounded-full bg-cyan-400/10 blur-[90px]" />
 
           {/* Border highlight */}
           <div className="pointer-events-none absolute inset-0 rounded-[32px] bg-gradient-to-b from-white/[0.08] via-transparent to-transparent" />
@@ -213,10 +201,7 @@ export const WelcomeView = forwardRef<
               transition={{ delay: 0.25 }}
               className="mb-4 flex items-center justify-center gap-2"
             >
-              <Sparkles
-                size={15}
-                className="text-cyan-300"
-              />
+              <Sparkles size={15} className="text-cyan-300" />
 
               <span className="text-xs font-semibold tracking-[0.22em] text-cyan-300">
                 YOUR AI HEALTH COMPANION
@@ -243,8 +228,8 @@ export const WelcomeView = forwardRef<
               transition={{ delay: 0.4 }}
               className="mx-auto mt-5 max-w-2xl text-base leading-7 text-slate-300 md:text-lg"
             >
-              A natural voice-first AI companion that helps you understand
-              basic health information in a simple, accessible way.
+              A natural voice-first AI companion that helps you understand basic health information
+              in a simple, accessible way.
             </motion.p>
 
             {/* ================================================= */}
@@ -260,15 +245,10 @@ export const WelcomeView = forwardRef<
                 className="group rounded-2xl border border-emerald-400/10 bg-emerald-400/[0.045] p-5 text-left transition-all hover:border-emerald-400/25 hover:bg-emerald-400/[0.08]"
               >
                 <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-400/10">
-                  <Activity
-                    size={20}
-                    className="text-emerald-300"
-                  />
+                  <Activity size={20} className="text-emerald-300" />
                 </div>
 
-                <h3 className="font-semibold text-white">
-                  Health Guidance
-                </h3>
+                <h3 className="font-semibold text-white">Health Guidance</h3>
 
                 <p className="mt-1 text-xs leading-5 text-slate-400">
                   Clear and accessible general health information.
@@ -283,15 +263,10 @@ export const WelcomeView = forwardRef<
                 className="group rounded-2xl border border-cyan-400/10 bg-cyan-400/[0.045] p-5 text-left transition-all hover:border-cyan-400/25 hover:bg-cyan-400/[0.08]"
               >
                 <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-xl bg-cyan-400/10">
-                  <Mic
-                    size={20}
-                    className="text-cyan-300"
-                  />
+                  <Mic size={20} className="text-cyan-300" />
                 </div>
 
-                <h3 className="font-semibold text-white">
-                  Voice First
-                </h3>
+                <h3 className="font-semibold text-white">Voice First</h3>
 
                 <p className="mt-1 text-xs leading-5 text-slate-400">
                   Just speak naturally and have a conversation with Anaya.
@@ -306,15 +281,10 @@ export const WelcomeView = forwardRef<
                 className="group rounded-2xl border border-violet-400/10 bg-violet-400/[0.045] p-5 text-left transition-all hover:border-violet-400/25 hover:bg-violet-400/[0.08]"
               >
                 <div className="mb-4 flex h-10 w-10 items-center justify-center rounded-xl bg-violet-400/10">
-                  <ShieldCheck
-                    size={20}
-                    className="text-violet-300"
-                  />
+                  <ShieldCheck size={20} className="text-violet-300" />
                 </div>
 
-                <h3 className="font-semibold text-white">
-                  Safe Guidance
-                </h3>
+                <h3 className="font-semibold text-white">Safe Guidance</h3>
 
                 <p className="mt-1 text-xs leading-5 text-slate-400">
                   General information — not diagnosis or prescriptions.
@@ -338,10 +308,7 @@ export const WelcomeView = forwardRef<
                 className="group relative h-14 w-full max-w-sm overflow-hidden rounded-full border border-cyan-300/20 bg-gradient-to-r from-cyan-500 to-emerald-500 text-sm font-bold tracking-wide text-white shadow-[0_0_35px_rgba(20,184,166,0.22)] transition-all hover:scale-[1.02] hover:shadow-[0_0_50px_rgba(20,184,166,0.35)]"
               >
                 <span className="relative z-10 flex items-center justify-center gap-3">
-                  <Mic
-                    size={18}
-                    strokeWidth={2}
-                  />
+                  <Mic size={18} strokeWidth={2} />
 
                   {startButtonText || 'Start talking'}
 
@@ -369,15 +336,15 @@ export const WelcomeView = forwardRef<
 
             {/* Disclaimer */}
             <p className="mx-auto mt-5 max-w-lg text-[11px] leading-5 text-slate-500">
-              Anaya provides general health information and does not replace
-              advice from a qualified healthcare professional.
+              Anaya provides general health information and does not replace advice from a qualified
+              healthcare professional.
             </p>
           </div>
         </div>
       </motion.main>
 
       {/* Bottom status */}
-      <div className="absolute bottom-5 left-0 right-0 z-20 text-center">
+      <div className="absolute right-0 bottom-5 left-0 z-20 text-center">
         <div className="inline-flex items-center gap-2 text-[10px] tracking-[0.18em] text-slate-600">
           <Sparkles size={11} />
           POWERED BY AI • VOICE-FIRST HEALTH ACCESS

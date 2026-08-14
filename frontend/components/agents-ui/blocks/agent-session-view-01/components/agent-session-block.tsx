@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useEffect, useRef, useState } from 'react';
-import { AnimatePresence, type MotionProps, motion } from 'motion/react';
 import {
   Activity,
   HeartPulse,
@@ -12,19 +11,13 @@ import {
   Volume2,
   Waves,
 } from 'lucide-react';
-
-import {
-  useAgent,
-  useSessionContext,
-  useSessionMessages,
-} from '@livekit/components-react';
-
+import { AnimatePresence, type MotionProps, motion } from 'motion/react';
+import { useAgent, useSessionContext, useSessionMessages } from '@livekit/components-react';
 import { AgentChatTranscript } from '@/components/agents-ui/agent-chat-transcript';
 import {
   AgentControlBar,
   type AgentControlBarControls,
 } from '@/components/agents-ui/agent-control-bar';
-
 import { Shimmer } from '@/components/ai-elements/shimmer';
 import { cn } from '@/lib/shadcn/utils';
 import { TileLayout } from './tile-view';
@@ -90,22 +83,14 @@ interface FadeProps {
   className?: string;
 }
 
-export function Fade({
-  top = false,
-  bottom = false,
-  className,
-}: FadeProps) {
+export function Fade({ top = false, bottom = false, className }: FadeProps) {
   return (
     <div
       className={cn(
         'pointer-events-none h-6',
-        top
-          ? 'bg-gradient-to-b from-[#050b12] to-transparent'
-          : '',
-        bottom
-          ? 'bg-gradient-to-t from-[#050b12] to-transparent'
-          : '',
-        className,
+        top ? 'bg-gradient-to-b from-[#050b12] to-transparent' : '',
+        bottom ? 'bg-gradient-to-t from-[#050b12] to-transparent' : '',
+        className
       )}
     />
   );
@@ -213,8 +198,7 @@ export function AgentSessionView_01({
     const lastMessageIsLocal = lastMessage?.from?.isLocal === true;
 
     if (scrollAreaRef.current && lastMessageIsLocal) {
-      scrollAreaRef.current.scrollTop =
-        scrollAreaRef.current.scrollHeight;
+      scrollAreaRef.current.scrollTop = scrollAreaRef.current.scrollHeight;
     }
   }, [messages]);
 
@@ -224,7 +208,7 @@ export function AgentSessionView_01({
       {...props}
       className={cn(
         'relative z-10 h-full w-full overflow-hidden bg-[#050b12] text-white',
-        className,
+        className
       )}
     >
       {/* ===================================================== */}
@@ -237,7 +221,7 @@ export function AgentSessionView_01({
 
         {/* Cyan glow */}
         <motion.div
-          className="absolute left-1/2 top-[-180px] h-[500px] w-[500px] -translate-x-1/2 rounded-full bg-cyan-500/10 blur-[120px]"
+          className="absolute top-[-180px] left-1/2 h-[500px] w-[500px] -translate-x-1/2 rounded-full bg-cyan-500/10 blur-[120px]"
           animate={{
             scale: [1, 1.15, 1],
             opacity: [0.35, 0.65, 0.35],
@@ -265,7 +249,7 @@ export function AgentSessionView_01({
 
         {/* Blue glow */}
         <motion.div
-          className="absolute bottom-[-200px] right-[-100px] h-[450px] w-[450px] rounded-full bg-blue-600/10 blur-[130px]"
+          className="absolute right-[-100px] bottom-[-200px] h-[450px] w-[450px] rounded-full bg-blue-600/10 blur-[130px]"
           animate={{
             x: [0, -40, 0],
             y: [0, -25, 0],
@@ -292,21 +276,15 @@ export function AgentSessionView_01({
       {/* HEADER */}
       {/* ===================================================== */}
 
-      <header className="absolute left-5 right-5 top-5 z-50 flex items-center justify-between md:left-8 md:right-8 md:top-7">
+      <header className="absolute top-5 right-5 left-5 z-50 flex items-center justify-between md:top-7 md:right-8 md:left-8">
         {/* Anaya branding */}
         <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.045] px-4 py-2.5 shadow-lg backdrop-blur-xl">
           <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-cyan-400/10">
-            <HeartPulse
-              size={20}
-              className="text-cyan-300"
-              strokeWidth={2}
-            />
+            <HeartPulse size={20} className="text-cyan-300" strokeWidth={2} />
           </div>
 
           <div>
-            <p className="text-sm font-bold tracking-[0.28em] text-white">
-              ANAYA
-            </p>
+            <p className="text-sm font-bold tracking-[0.28em] text-white">ANAYA</p>
 
             <p className="text-[9px] font-medium tracking-[0.25em] text-cyan-300/70">
               HEALTH ACCESS AI
@@ -341,26 +319,20 @@ export function AgentSessionView_01({
       {/* MAIN AGENT AREA */}
       {/* ===================================================== */}
 
-      <main className="absolute inset-0 flex items-center justify-center px-5 pb-28 pt-24">
+      <main className="absolute inset-0 flex items-center justify-center px-5 pt-24 pb-28">
         <div className="relative flex h-full w-full max-w-5xl items-center justify-center">
-          
           {/* ================================================= */}
           {/* AGENT ORB */}
           {/* ================================================= */}
 
           {!chatOpen && (
-            <div className="absolute left-1/2 top-1/2 z-20 -translate-x-1/2 -translate-y-1/2">
-              
+            <div className="absolute top-1/2 left-1/2 z-20 -translate-x-1/2 -translate-y-1/2">
               {/* Outer pulse */}
               <motion.div
                 className="absolute -inset-14 rounded-full border border-cyan-400/10"
                 animate={{
-                  scale: isSpeaking
-                    ? [1, 1.25, 1]
-                    : [1, 1.08, 1],
-                  opacity: isSpeaking
-                    ? [0.15, 0.5, 0.15]
-                    : [0.1, 0.25, 0.1],
+                  scale: isSpeaking ? [1, 1.25, 1] : [1, 1.08, 1],
+                  opacity: isSpeaking ? [0.15, 0.5, 0.15] : [0.1, 0.25, 0.1],
                 }}
                 transition={{
                   duration: isSpeaking ? 1.2 : 3,
@@ -372,12 +344,8 @@ export function AgentSessionView_01({
               <motion.div
                 className="absolute -inset-8 rounded-full bg-cyan-400/10 blur-3xl"
                 animate={{
-                  scale: isSpeaking
-                    ? [1, 1.3, 1]
-                    : [1, 1.1, 1],
-                  opacity: isSpeaking
-                    ? [0.35, 0.8, 0.35]
-                    : [0.2, 0.45, 0.2],
+                  scale: isSpeaking ? [1, 1.3, 1] : [1, 1.1, 1],
+                  opacity: isSpeaking ? [0.35, 0.8, 0.35] : [0.2, 0.45, 0.2],
                 }}
                 transition={{
                   duration: isSpeaking ? 1.1 : 3,
@@ -389,12 +357,8 @@ export function AgentSessionView_01({
               <motion.div
                 className="relative flex h-40 w-40 items-center justify-center rounded-full border border-cyan-300/30 bg-gradient-to-br from-cyan-400 via-teal-500 to-blue-600 shadow-[0_0_80px_rgba(34,211,238,0.35)] md:h-52 md:w-52"
                 animate={{
-                  y: isSpeaking
-                    ? [0, -8, 0]
-                    : [0, -4, 0],
-                  scale: isSpeaking
-                    ? [1, 1.04, 1]
-                    : [1, 1.015, 1],
+                  y: isSpeaking ? [0, -8, 0] : [0, -4, 0],
+                  scale: isSpeaking ? [1, 1.04, 1] : [1, 1.015, 1],
                 }}
                 transition={{
                   duration: isSpeaking ? 1.2 : 4,
@@ -416,7 +380,7 @@ export function AgentSessionView_01({
 
                 {/* AI dot */}
                 <motion.div
-                  className="absolute right-7 top-7 h-3.5 w-3.5 rounded-full bg-emerald-300 shadow-[0_0_18px_rgba(110,231,183,0.9)]"
+                  className="absolute top-7 right-7 h-3.5 w-3.5 rounded-full bg-emerald-300 shadow-[0_0_18px_rgba(110,231,183,0.9)]"
                   animate={{
                     opacity: [0.4, 1, 0.4],
                   }}
@@ -463,35 +427,19 @@ export function AgentSessionView_01({
               <div className="rounded-2xl border border-white/10 bg-white/[0.045] px-7 py-4 shadow-2xl backdrop-blur-2xl">
                 <div className="mb-1 flex items-center justify-center gap-2">
                   {isSpeaking ? (
-                    <Volume2
-                      size={16}
-                      className="text-cyan-300"
-                    />
+                    <Volume2 size={16} className="text-cyan-300" />
                   ) : isListening ? (
-                    <Mic
-                      size={16}
-                      className="text-emerald-300"
-                    />
+                    <Mic size={16} className="text-emerald-300" />
                   ) : isThinking ? (
-                    <Sparkles
-                      size={16}
-                      className="text-cyan-300"
-                    />
+                    <Sparkles size={16} className="text-cyan-300" />
                   ) : (
-                    <Activity
-                      size={16}
-                      className="text-cyan-300"
-                    />
+                    <Activity size={16} className="text-cyan-300" />
                   )}
 
-                  <span className="text-sm font-semibold text-white">
-                    {statusText}
-                  </span>
+                  <span className="text-sm font-semibold text-white">{statusText}</span>
                 </div>
 
-                <p className="text-xs text-slate-400">
-                  {statusDescription}
-                </p>
+                <p className="text-xs text-slate-400">{statusDescription}</p>
 
                 {/* Voice activity dots */}
                 {(isSpeaking || isListening) && (
@@ -529,28 +477,18 @@ export function AgentSessionView_01({
                 {/* Chat header */}
                 <div className="flex items-center gap-3 border-b border-white/10 px-5 py-4">
                   <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-cyan-400/10">
-                    <HeartPulse
-                      size={18}
-                      className="text-cyan-300"
-                    />
+                    <HeartPulse size={18} className="text-cyan-300" />
                   </div>
 
                   <div>
-                    <p className="text-sm font-semibold text-white">
-                      Conversation with Anaya
-                    </p>
+                    <p className="text-sm font-semibold text-white">Conversation with Anaya</p>
 
-                    <p className="text-xs text-slate-400">
-                      Health Access AI
-                    </p>
+                    <p className="text-xs text-slate-400">Health Access AI</p>
                   </div>
                 </div>
 
                 {/* Transcript */}
-                <div
-                  ref={scrollAreaRef}
-                  className="flex-1 overflow-y-auto"
-                >
+                <div ref={scrollAreaRef} className="flex-1 overflow-y-auto">
                   <AgentChatTranscript
                     agentState={agentState}
                     messages={messages}
@@ -604,7 +542,7 @@ export function AgentSessionView_01({
       {/* FOOTER */}
       {/* ===================================================== */}
 
-      <div className="pointer-events-none absolute bottom-2 left-0 right-0 z-20 hidden justify-center md:flex">
+      <div className="pointer-events-none absolute right-0 bottom-2 left-0 z-20 hidden justify-center md:flex">
         <p className="text-[9px] font-medium tracking-[0.2em] text-slate-500">
           ANAYA • VOICE-POWERED HEALTH ACCESS
         </p>

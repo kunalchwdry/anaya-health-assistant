@@ -33,39 +33,32 @@ export interface AppConfig {
 }
 
 export const APP_CONFIG_DEFAULTS: AppConfig = {
-  companyName: 'Murf AI',
-  pageTitle: 'Voice Agent Starter',
-  pageDescription: 'A voice agent powered by Murf Falcon — the fastest TTS API',
+  companyName: 'Anaya',
+  pageTitle: 'Anaya — Voice of Bharat',
+  pageDescription:
+    'Your voice-first AI health-access companion. Speak naturally in 10+ Indian languages.',
 
   supportsChatInput: true,
-  supportsVideoInput: true,
-  supportsScreenShare: true,
+  supportsVideoInput: false,
+  supportsScreenShare: false,
   isPreConnectBufferEnabled: true,
 
-  logo: '/murf-logo.svg',
-  accent: '#6366F1',
-  logoDark: '/murf-logo-dark.svg',
-  accentDark: '#818cf8',
-  startButtonText: 'Start talking',
+  logo: '/anaya-logo.svg',
+  accent: '#37d4d0',
+  logoDark: '/anaya-logo-dark.svg',
+  accentDark: '#37d4d0',
+  startButtonText: 'Talk to Anaya',
 
-  // optional: audio visualization configuration
-  // audioVisualizerType: 'bar',
-  // audioVisualizerColor: '#002cf2',
-  // audioVisualizerColorDark: '#1fd5f9',
-  // audioVisualizerColorShift: 0.3,
-  // audioVisualizerBarCount: 5,
-  // audioVisualizerType: 'radial',
-  // audioVisualizerRadialBarCount: 24,
-  // audioVisualizerRadialRadius: 100,
-  // audioVisualizerType: 'grid',
-  // audioVisualizerGridRowCount: 25,
-  // audioVisualizerGridColumnCount: 25,
-  // audioVisualizerType: 'wave',
-  // audioVisualizerWaveLineWidth: 3,
-  // audioVisualizerType: 'aura',
+  // audio visualization configuration
+  audioVisualizerType: 'aura',
+  audioVisualizerColor: '#37d4d0',
+  audioVisualizerColorDark: '#37d4d0',
+  audioVisualizerColorShift: 0.2,
+  audioVisualizerRadialBarCount: 25,
+  audioVisualizerRadialRadius: 100,
 
   // agent dispatch configuration
-  agentName: process.env.AGENT_NAME ?? undefined,
+  agentName: 'Anaya',
 
   // LiveKit Cloud Sandbox configuration
   sandboxId: undefined,
